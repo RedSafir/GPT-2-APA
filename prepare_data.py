@@ -68,6 +68,11 @@ def parse_args() -> argparse.Namespace:
         help="Jumlah dokumen per chunk saat menulis ke disk "
              "(default: 8192). Turunkan jika RAM terbatas.",
     )
+    parser.add_argument(
+        "--dataset-name", type=str, default="Skylion007/openwebtext",
+        help="Nama repository dataset HuggingFace "
+             "(default: Skylion007/openwebtext).",
+    )
     return parser.parse_args()
 
 
@@ -75,12 +80,15 @@ def parse_args() -> argparse.Namespace:
 # LANGKAH 1: UNDUH DATASET
 # ═════════════════════════════════════════════════════════════════════
 
-def load_openwebtext():
+def load_openwebtext(dataset_name: str = "Skylion007/openwebtext"):
     """Unduh dataset OpenWebText dari HuggingFace (publik, tanpa API key).
 
     Dataset ini berisi ~8 juta dokumen teks web yang dikurasi.
     HuggingFace datasets akan meng-cache hasil unduhan secara otomatis
     di ~/.cache/huggingface/datasets/ untuk penggunaan ulang.
+
+    Args:
+        dataset_name: Repo ID HuggingFace (default: "Skylion007/openwebtext").
 
     Returns:
         datasets.Dataset: Seluruh dataset (split 'train' saja dari HF).
@@ -90,20 +98,39 @@ def load_openwebtext():
     print("\n" + "=" * 72)
     print("  LANGKAH 1: MENGUNDUH DATASET OPENWEBTEXT")
     print("=" * 72)
-    print("  Sumber   : HuggingFace 'openwebtext' (publik, tanpa API key)")
+    print(f"  Sumber   : HuggingFace '{dataset_name}' (publik, tanpa API key)")
     print("  Cache    : ~/.cache/huggingface/datasets/")
     print("  Info     : ~8 juta dokumen, ~38 GB teks mentah\n")
 
     t0 = time.time()
 
-    # trust_remote_code=False karena dataset ini bawaan HF, tidak perlu
-    # kode kustom. num_proc diset agar proses extraction lebih cepat.
-    dataset = load_dataset(
-        "openwebtext",
-        split="train",           # HF hanya punya split 'train'
-        trust_remote_code=False,
-        num_proc=8,              # Paralel extraction dari arrow files
-    )
+    candidates = [dataset_name]
+    if dataset_name != "Skylion007/openwebtext":
+        candidates.append("Skylion007/openwebtext")
+    if dataset_name != "openwebtext":
+        candidates.append("openwebtext")
+
+    dataset = None
+    last_err = None
+
+    for candidate in candidates:
+        try:
+            print(f"  ℹ  Mencoba memuat: '{candidate}'...")
+            dataset = load_dataset(
+                candidate,
+                split="train",           # HF hanya punya split 'train'
+                trust_remote_code=False,
+                num_proc=8,              # Paralel extraction dari arrow files
+            )
+            print(f"  ✔  Berhasil memuat dari '{candidate}'")
+            break
+        except Exception as e:
+            print(f"  ⚠  Gagal memuat '{candidate}': {e}")
+            last_err = e
+
+    if dataset is None:
+        print("\n[ERROR] Tidak dapat memuat dataset OpenWebText.")
+        raise last_err
 
     elapsed = time.time() - t0
     print(f"  ✔  Dataset dimuat: {len(dataset):,} dokumen")
@@ -395,7 +422,7 @@ def main():
             print(f"     File akan ditimpa!\n")
 
     # ── Langkah 1: Unduh dataset ──────────────────────────────────
-    dataset = load_openwebtext()
+    dataset = load_openwebtext(args.dataset_name)
 
     # ── Langkah 2: Split train/val ────────────────────────────────
     print("=" * 72)
