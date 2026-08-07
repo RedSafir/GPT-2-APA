@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data & Logs
+data/
+*.bin
+*.csv
+
+# Environments & IDEs
+.venv/
+venv/
+ENV/
+.idea/
+.vscode/
