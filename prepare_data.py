@@ -73,6 +73,11 @@ def parse_args() -> argparse.Namespace:
         help="Nama repository dataset HuggingFace "
              "(default: Skylion007/openwebtext).",
     )
+    parser.add_argument(
+        "--hf-token", type=str, default=None,
+        help="Token akses HuggingFace (HF_TOKEN) untuk otentikasi "
+             "(opsional, bisa juga via env var HF_TOKEN).",
+    )
     return parser.parse_args()
 
 
@@ -80,8 +85,9 @@ def parse_args() -> argparse.Namespace:
 # LANGKAH 1: UNDUH DATASET
 # ═════════════════════════════════════════════════════════════════════
 
-def load_openwebtext(dataset_name: str = "Skylion007/openwebtext"):
-    """Unduh dataset OpenWebText dari HuggingFace (publik, tanpa API key).
+def load_openwebtext(dataset_name: str = "Skylion007/openwebtext",
+                       hf_token: str | None = None):
+    """Unduh dataset OpenWebText dari HuggingFace.
 
     Dataset ini berisi ~8 juta dokumen teks web yang dikurasi.
     HuggingFace datasets akan meng-cache hasil unduhan secara otomatis
@@ -89,16 +95,21 @@ def load_openwebtext(dataset_name: str = "Skylion007/openwebtext"):
 
     Args:
         dataset_name: Repo ID HuggingFace (default: "Skylion007/openwebtext").
+        hf_token: Token akses HuggingFace (opsional).
 
     Returns:
         datasets.Dataset: Seluruh dataset (split 'train' saja dari HF).
     """
     from datasets import load_dataset
 
+    # Ambil token dari argumen atau dari environment variable HF_TOKEN / HUGGING_FACE_HUB_TOKEN
+    token = hf_token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+
     print("\n" + "=" * 72)
     print("  LANGKAH 1: MENGUNDUH DATASET OPENWEBTEXT")
     print("=" * 72)
-    print(f"  Sumber   : HuggingFace '{dataset_name}' (publik, tanpa API key)")
+    print(f"  Sumber   : HuggingFace '{dataset_name}'")
+    print(f"  HF Token : {'Terdeteksi (Diautentikasi)' if token else 'Tidak ada (Unauthenticated)'}")
     print("  Cache    : ~/.cache/huggingface/datasets/")
     print("  Info     : ~8 juta dokumen, ~38 GB teks mentah\n")
 
@@ -116,12 +127,15 @@ def load_openwebtext(dataset_name: str = "Skylion007/openwebtext"):
     for candidate in candidates:
         try:
             print(f"  ℹ  Mencoba memuat: '{candidate}'...")
-            dataset = load_dataset(
-                candidate,
-                split="train",           # HF hanya punya split 'train'
-                trust_remote_code=False,
-                num_proc=8,              # Paralel extraction dari arrow files
-            )
+            kwargs = {
+                "split": "train",
+                "trust_remote_code": False,
+                "num_proc": 8,
+            }
+            if token:
+                kwargs["token"] = token
+
+            dataset = load_dataset(candidate, **kwargs)
             print(f"  ✔  Berhasil memuat dari '{candidate}'")
             break
         except Exception as e:
@@ -422,7 +436,7 @@ def main():
             print(f"     File akan ditimpa!\n")
 
     # ── Langkah 1: Unduh dataset ──────────────────────────────────
-    dataset = load_openwebtext(args.dataset_name)
+    dataset = load_openwebtext(args.dataset_name, args.hf_token)
 
     # ── Langkah 2: Split train/val ────────────────────────────────
     print("=" * 72)
